@@ -1,54 +1,46 @@
 # distributed-tensorflow
 Implementation example of distributed TensorFlow
 
-This project is a rewrite of the tutorial code for distributed processing based on the skeleton shown in the official TensorFlow document.
+## Implementation
 
-Distributed TensorFlow's skeleton is [here](https://www.tensorflow.org/deploy/distributed "Distributed TensorFlow | TensorFlow").
+Two implementation examples are available:
 
-## Distributed Deep MNIST
-
-Note: Distributed Deep MNIST is supposed to run in the TensorFlow 1.2 environment.
+* "Distributed Deep MNIST" - [distributed-deep-mnist.py](distributed-deep-mnist.py)
+* "Distributed Deep MNIST with Queue" - [distributed-deep-mnist-with-queue.py](distributed-deep-mnist-with-queue.py)
 
 ### Distributed Deep MNIST
 
-"Distributed Deep MNIST" ([distributed-deep-mnist.py](distributed-deep-mnist.py)) is based on Distributed TensorFlow's skeleton and rewrites "[Deep MNIST for Experts](https://www.tensorflow.org/get_started/mnist/pros "Deep MNIST for Experts | TensorFlow")" for distributed processing.
+"Distributed Deep MNIST" is based on Distributed TensorFlow's [skeleton](https://www.tensorflow.org/deploy/distributed#putting_it_all_together_example_trainer_program) and rewrites "[Deep MNIST for Experts](https://www.tensorflow.org/get_started/mnist/pros "Deep MNIST for Experts | TensorFlow")" for distributed processing.
 
 ### Distributed Deep MNIST with Queue
 
-"Distributed Deep MNIST with Queue" ([distributed-deep-mnist-with-queue.py](distributed-deep-mnist-with-queue.py)) implements a mechanism to detect the task completion of the worker server and terminate the parameter server normally by introducing the queue. This script can be executed using the same option as "Distributed Deep MNIST".
+"Distributed Deep MNIST" has to manually kill the process of the parameter server because it does not terminate when the task of the worker server is completed.
 
-### Quick Usage
+To solve this problem, "Distributed Deep MNIST with Queue" implements a mechanism to detect the task completion of the worker server and terminate the parameter server normally by introducing the queue. 
 
-To quickly try Distributed Deep MNIST, run the following commands on a single machine. If you want to try on multiple machines, change "localhost" to any hosts.
+Note: 
+* They are supposed to run in the TensorFlow 1.2 environment.
+* These execution methods and execution options are common.
+
+## Quick Usage
+
+### Try quickly on a single machine
+
+To quickly try distributed TensorFlow, run the following commands on a single machine. 
 
 Example of execution with one parameter server and two worker servers.
 
 ```
-Terminal1# python distributed-deep-mnist.py --ps_hosts=localhost:2222 --worker_hosts=localhost:2223,localhost:2224 --job_name=ps --task_index=0
-Terminal2# python distributed-deep-mnist.py --ps_hosts=localhost:2222 --worker_hosts=localhost:2223,localhost:2224 --job_name=worker --task_index=0
-Terminal3# python distributed-deep-mnist.py --ps_hosts=localhost:2222 --worker_hosts=localhost:2223,localhost:2224 --job_name=worker --task_index=1
+Terminal1# python <FILENAME> --ps_hosts=localhost:2222 --worker_hosts=localhost:2223,localhost:2224 --job_name=ps --task_index=0
+Terminal2# python <FILENAME> --ps_hosts=localhost:2222 --worker_hosts=localhost:2223,localhost:2224 --job_name=worker --task_index=0
+Terminal3# python <FILENAME> --ps_hosts=localhost:2222 --worker_hosts=localhost:2223,localhost:2224 --job_name=worker --task_index=1
 ```
 
-### Show all options
+Training starts after three commands are executed. MNIST dataset is downloaded to `/tmp/data_mnist` directory and trained model is saved in  `/tmp/train_logs` directory. These directories can be changed with the `--data_dir` option and `--log_dir` option respectively.
 
-`--help` can be used to display all options
+### When trying on multiple machines
 
-```
-# python distributed-deep-mnist.py --help
-usage: distributed-deep-mnist.py [-h] [--ps_hosts PS_HOSTS]
-                                 [--worker_hosts WORKER_HOSTS]
-                                 [--job_name JOB_NAME]
-                                 [--task_index TASK_INDEX]
-                                 [--data_dir DATA_DIR] [--log_dir LOG_DIR]
+Execution method is not much different from that on a single machine, but there are the following changes.
 
-optional arguments:
-  -h, --help            show this help message and exit
-  --ps_hosts PS_HOSTS   Comma-separated list of hostname:port pairs
-  --worker_hosts WORKER_HOSTS
-                        Comma-separated list of hostname:port pairs
-  --job_name JOB_NAME   One of 'ps', 'worker'
-  --task_index TASK_INDEX
-                        Index of task within the job
-  --data_dir DATA_DIR   Directory for storing input data
-  --log_dir LOG_DIR     Directory for train logs
-```
+* Change localhost to another Hostname or IP address.
+* `--log_dir` must specify a shared directory accessible to all hosts making up the cluster.
