@@ -51,6 +51,10 @@ def bias_variable(shape):
   initial = tf.constant(0.1, shape=shape)
   return tf.Variable(initial)
 
+def create_queue(job_name, task_index, worker_hosts):
+  with tf.device("/job:%s/task:%d" % (job_name, task_index)):
+    return tf.FIFOQueue(len(worker_hosts), tf.int32, shared_name="queue_"+str(job_name)+"_"+str(task_index))
+
 def main(_):
   ps_hosts = FLAGS.ps_hosts.split(",")
   worker_hosts = FLAGS.worker_hosts.split(",")
@@ -65,8 +69,8 @@ def main(_):
 
   if FLAGS.job_name == "ps":
 
-    with tf.device("/job:ps/task:%d" % FLAGS.task_index):
-      queue = tf.FIFOQueue(len(worker_hosts), tf.int32, shared_name="queue"+str(FLAGS.task_index)) 
+    # Control shutdown of parameter server in queue instead of server.join() function.
+    queue = create_queue(FLAGS.job_name, FLAGS.task_index, worker_hosts)
 
     with tf.Session(server.target) as sess:
       for i in range(len(worker_hosts)):
@@ -96,10 +100,13 @@ def main(_):
       correct_prediction = tf.equal(tf.argmax(y_conv, 1), tf.argmax(y_, 1))
       accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-    with tf.device("/job:ps/task:0"):
-      queues = []
-      for i in range(len(ps_hosts)):
-        queues.append(tf.FIFOQueue(len(worker_hosts), tf.int32, shared_name="queue"+str(i)))
+    # Create queues for all servers participating in the cluster.
+    queue = create_queue(FLAGS.job_name, FLAGS.task_index, worker_hosts)
+    queues = []
+    for i in range(len(ps_hosts)):
+      queues.append(create_queue("ps", i, worker_hosts))
+    for i in range(len(worker_hosts)):
+      queues.append(create_queue("worker", i, worker_hosts))
 
     # The StopAtStepHook handles stopping after running given steps.
     hooks=[tf.train.StopAtStepHook(last_step=1000)]
@@ -123,9 +130,12 @@ def main(_):
         mon_sess.run(train_step, feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
         i = i + 1
 
+    # Notification of task completion and wait for task completion of other worker server.
     with tf.Session(server.target) as sess:
-      for queue in queues:
-        sess.run(queue.enqueue(1))
+      for q in queues:
+        sess.run(q.enqueue(1))
+      for i in range(len(worker_hosts)):
+        sess.run(queue.dequeue())
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser()
